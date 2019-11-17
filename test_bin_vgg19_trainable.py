@@ -32,17 +32,19 @@ def print_pred(prob,gt,flag):
 #   print(item)
     if item[0] == item[1]:
       corrects += 1
-  print(flag,' acc: ', corrects/len(gt))
+  acc = corrects/len(gt)
+  print(flag,' acc: ', acc)
+  return acc
 
 with tf.device('/cpu:0'):
     sess = tf.Session()
 
 #   images = tf.placeholder(tf.float32, [sample_count, 224, 224, 3])
-    images = tf.placeholder(tf.float32, [None, 224, 224, 3])
+    images = tf.placeholder(tf.float32, [None, 224, 224, 3],name='images')
 #   true_out = tf.placeholder(tf.float32, [1, 1000])
 #   true_out = tf.placeholder(tf.float32, [sample_count, 1])
     true_out = tf.placeholder(tf.float32, [None, 1])
-    train_mode = tf.placeholder(tf.bool)
+    train_mode = tf.placeholder(tf.bool,name='mode')
 
     vgg = vgg19.Vgg19('./vgg19.npy')
     vgg.build(images, train_mode)
@@ -69,6 +71,8 @@ with tf.device('/cpu:0'):
     print_pred(prob, label,'train')
     prob = sess.run(vgg.prob, feed_dict={images: batch2, train_mode: False})
     print_pred(prob, label2, 'test')
+    
+    saver = tf.train.Saver()
 
     for i in range(100):
       batch_aug = []
@@ -99,9 +103,14 @@ with tf.device('/cpu:0'):
       print('train loss ', loss_train)
       loss_test = sess.run(cost, feed_dict={images: batch2, true_out: label2, train_mode: False})
       print('test loss ', loss_test)
-      prob = sess.run(vgg.prob, feed_dict={images: batch, train_mode: False})
-      print_pred(prob, label,'train')
-      prob = sess.run(vgg.prob, feed_dict={images: batch2, train_mode: False})
-      print_pred(prob, label2,'test')
+      train_prob = sess.run(vgg.prob, feed_dict={images: batch, train_mode: False})
+      train_acc = print_pred(train_prob, label,'train')
+      test_prob = sess.run(vgg.prob, feed_dict={images: batch2, train_mode: False})
+      test_acc = print_pred(test_prob, label2,'test')
+
+      if train_acc>0.9 and test_acc>0.85:
+          save_path = saver.save(sess, "vgg19-model/model.ckpt")
+          print('stop training, save model')
+          break
+
     # test save
-#   vgg.save_npy(sess, './test-save.npy')
